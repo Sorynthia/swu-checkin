@@ -27,7 +27,7 @@ def check_in(username: str, password: str, timeout: int = 10):
             headers = {"fighter-auth-token": token, "Content-Type": "application/json;charset=UTF-8"}
             url = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
             params = {"formId": formid, "isSubmitProcess": False}
-            dormitory = get_dormitory(token, timeout)["data"]["columList"]
+            dormitory = get_dormitory(token, timeout)["data"]["columnList"]
             payload = {
                 "id": id,
                 "formId": formid,
