@@ -1,10 +1,12 @@
 # SWU 查寝打卡脚本
 
-西南大学钉钉查寝自动打卡脚本，使用校园网账号密码登录。
+西南大学钉钉查寝自动打卡独立脚本。适用于需要在本地或云函数中运行自动打卡的场景。
 
 ## 功能特性
 
 - ✅ 自动获取当日打卡任务
+- ✅ 支持统一身份认证登录
+- ✅ OCR 自动识别验证码
 - ✅ 自动填写宿舍信息和位置
 - ✅ 支持请假状态检测
 - ✅ 防重复打卡
@@ -84,6 +86,28 @@ python scripts/check_in.py
 - ⚠️ 切勿将账号密码写入代码或提交到仓库
 - ⚠️ 建议在正式使用前先手动测试一次
 - ⚠️ 网络异常时可重试或稍后执行
+
+## 相关项目
+
+- **[swu-login](https://github.com/Sorynthia/swu-login)** - 西南大学统一身份认证独立登录模块
+- **[swudk-dingtalk](https://github.com/Sorynthia/swudk-dingtalk)** - 钉钉扫码打卡前端工具
+
+如需完整的后端服务系统（API、用户管理、定时任务等），请参考 swudk 私有仓库。
+
+## 贡献指南
+
+欢迎提交 Issue 和 Pull Request！请查看 [CONTRIBUTING.md](CONTRIBUTING.md) 了解详细信息。
+
+## 引用与归属
+
+如果你在项目中使用或参考了本代码，建议按以下方式标注：
+
+```
+基于 Sorynthia/swu-checkin 开发
+GitHub: https://github.com/Sorynthia/swu-checkin
+```
+
+本项目采用 MIT 许可证，欢迎使用和修改，但请保留原作者信息。
 
 ## 许可证
 
