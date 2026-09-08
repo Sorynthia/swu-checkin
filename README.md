@@ -85,21 +85,6 @@ python scripts/check_in.py
 - ⚠️ 建议在正式使用前先手动测试一次
 - ⚠️ 网络异常时可重试或稍后执行
 
-## 更新日志
-
-### 2026.9.8
-- 简化为核心打卡功能，移除钉钉扫码等额外模块
-- 迁移到 pyproject.toml 管理依赖
-- 适配 Python 3.13
-- 完善文档结构
-
-### 2026.4.10
-- 修复官方登录接口变化
-
-## 相关项目
-
-- [SWUDK 后端服务](https://github.com/Sorynthia/swudk) - 完整的查寝打卡管理系统
-
 ## 许可证
 
 MIT License
