@@ -12,7 +12,7 @@
 
 ## 环境要求
 
-- Python 3.11+
+- Python 3.13+
 - 依赖库：requests, beautifulsoup4, Pillow, ddddocr, qrcode
 
 ## 快速开始
@@ -20,7 +20,11 @@
 ### 1. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+# 使用 pip
+pip install -e .
+
+# 或使用 uv（推荐）
+uv sync
 ```
 
 ### 2. 本地运行
@@ -48,8 +52,8 @@ python scripts/check_in.py
 3. 添加以下 Repository secrets：
    - SWUDK_USERNAME：你的学号
    - SWUDK_PASSWORD：你的密码
-4. 在 **Actions** 页面启用工作流
-5. 脚本将在每天 21:10（北京时间）自动运行
+4. 创建 .github/workflows/checkin.yml 工作流文件
+5. 脚本将按配置时间自动运行
 
 ## 返回状态码
 
@@ -75,8 +79,23 @@ python scripts/check_in.py
 │   ├── identity.py       # 身份验证
 │   ├── des.py            # DES 加密工具
 │   └── new.py            # 新版本适配
-├── requirements.txt      # Python 依赖
+├── pyproject.toml        # 项目配置和依赖
 └── README.md
+```
+
+## 开发
+
+项目使用 pyproject.toml 管理依赖和配置：
+
+```bash
+# 安装开发依赖
+uv sync
+
+# 代码格式化
+ruff format .
+
+# 代码检查
+ruff check .
 ```
 
 ## 注意事项
@@ -89,6 +108,8 @@ python scripts/check_in.py
 ## 更新日志
 
 ### 2026.9.8
+- 迁移到 pyproject.toml 管理依赖
+- 适配 Python 3.13
 - 适配 SWUDK 后端脚本
 - 移除 GitHub Actions 工作流（由用户自行配置）
 - 完善文档结构
