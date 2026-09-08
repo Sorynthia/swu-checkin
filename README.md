@@ -31,12 +31,30 @@ uv sync
 
 ### 2. 本地运行
 
+安装后可直接使用命令行工具：
+
+```bash
+# 设置环境变量后运行
+export SWUDK_USERNAME="你的学号"
+export SWUDK_PASSWORD="你的密码"
+swu-checkin
+```
+
+或作为 Python 模块调用：
+
+```python
+from swu_checkin import check_in
+
+# 从环境变量读取账号密码
+check_in()
+```
+
 #### Windows PowerShell
 
 ```powershell
 $env:SWUDK_USERNAME="你的学号"
 $env:SWUDK_PASSWORD="你的密码"
-python scripts/check_in.py
+swu-checkin
 ```
 
 #### Linux / macOS
@@ -44,7 +62,7 @@ python scripts/check_in.py
 ```bash
 export SWUDK_USERNAME="你的学号"
 export SWUDK_PASSWORD="你的密码"
-python scripts/check_in.py
+swu-checkin
 ```
 
 ## 返回状态码
@@ -62,13 +80,15 @@ python scripts/check_in.py
 
 ```
 .
-├── scripts/
-│   ├── check_in.py       # 主打卡脚本
-│   ├── get_info.py       # 信息获取模块（token、学号、宿舍信息）
-│   ├── verify.py         # 登录验证模块
-│   ├── identity.py       # 身份选择处理
-│   └── des.py            # DES 加密工具
-├── pyproject.toml        # 项目配置和依赖
+├── src/
+│   └── swu_checkin/
+│       ├── __init__.py
+│       ├── check_in.py    # 主打卡脚本
+│       ├── get_info.py    # 信息获取模块
+│       ├── verify.py      # 登录验证模块
+│       ├── identity.py    # 身份选择处理
+│       └── des.py         # DES 加密工具
+├── pyproject.toml         # 项目配置和依赖
 └── README.md
 ```
 
@@ -91,8 +111,6 @@ python scripts/check_in.py
 
 - **[swu-login](https://github.com/Sorynthia/swu-login)** - 西南大学统一身份认证独立登录模块
 - **[swudk-dingtalk](https://github.com/Sorynthia/swudk-dingtalk)** - 钉钉扫码打卡前端工具
-
-如需完整的后端服务系统（API、用户管理、定时任务等），请参考 swudk 私有仓库。
 
 ## 贡献指南
 
