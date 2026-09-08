@@ -1,6 +1,6 @@
 # SWU 查寝打卡脚本
 
-西南大学钉钉查寝自动打卡脚本，支持本地运行和 GitHub Actions 定时任务。
+西南大学钉钉查寝自动打卡脚本，使用校园网账号密码登录。
 
 ## 功能特性
 
@@ -13,7 +13,7 @@
 ## 环境要求
 
 - Python 3.13+
-- 依赖库：requests, beautifulsoup4, Pillow, ddddocr, qrcode
+- 依赖库：requests, beautifulsoup4, Pillow, ddddocr
 
 ## 快速开始
 
@@ -45,16 +45,6 @@ export SWUDK_PASSWORD="你的密码"
 python scripts/check_in.py
 ```
 
-### 3. GitHub Actions 自动打卡（可选）
-
-1. Fork 本仓库到你的 GitHub 账号
-2. 进入仓库 **Settings** → **Secrets and variables** → **Actions**
-3. 添加以下 Repository secrets：
-   - SWUDK_USERNAME：你的学号
-   - SWUDK_PASSWORD：你的密码
-4. 创建 .github/workflows/checkin.yml 工作流文件
-5. 脚本将按配置时间自动运行
-
 ## 返回状态码
 
 | 状态码 | 含义 |
@@ -72,46 +62,35 @@ python scripts/check_in.py
 .
 ├── scripts/
 │   ├── check_in.py       # 主打卡脚本
-│   ├── get_info.py       # 信息获取模块
+│   ├── get_info.py       # 信息获取模块（token、学号、宿舍信息）
 │   ├── verify.py         # 登录验证模块
-│   ├── dingding.py       # 钉钉扫码登录
-│   ├── swu_login.py      # 校园网统一认证
-│   ├── identity.py       # 身份验证
-│   ├── des.py            # DES 加密工具
-│   └── new.py            # 新版本适配
+│   ├── identity.py       # 身份选择处理
+│   └── des.py            # DES 加密工具
 ├── pyproject.toml        # 项目配置和依赖
 └── README.md
 ```
 
-## 开发
+## 工作流程
 
-项目使用 pyproject.toml 管理依赖和配置：
-
-```bash
-# 安装开发依赖
-uv sync
-
-# 代码格式化
-ruff format .
-
-# 代码检查
-ruff check .
-```
+1. 使用校园网账号密码登录统一身份认证
+2. 通过 OCR 识别验证码自动登录
+3. 获取 token 和打卡任务信息
+4. 检测请假状态
+5. 自动填写宿舍位置信息并提交打卡
 
 ## 注意事项
 
-- ⚠️ 脚本仅从环境变量读取账号密码，不支持手动输入
-- ⚠️ 请通过 GitHub Secrets 管理敏感信息，切勿将账号密码写入代码
+- ⚠️ 脚本仅从环境变量读取账号密码
+- ⚠️ 切勿将账号密码写入代码或提交到仓库
 - ⚠️ 建议在正式使用前先手动测试一次
 - ⚠️ 网络异常时可重试或稍后执行
 
 ## 更新日志
 
 ### 2026.9.8
+- 简化为核心打卡功能，移除钉钉扫码等额外模块
 - 迁移到 pyproject.toml 管理依赖
 - 适配 Python 3.13
-- 适配 SWUDK 后端脚本
-- 移除 GitHub Actions 工作流（由用户自行配置）
 - 完善文档结构
 
 ### 2026.4.10
