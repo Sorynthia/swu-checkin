@@ -1,21 +1,36 @@
-import time
+from datetime import datetime
+from getpass import getpass
+import json
 import os
-from get_info import *
-import requests
-from des import des
+import time
 
-def check_in(username: str, password: str, timeout: int = 10):
+import requests
+
+from get_info import get_dormitory, get_student_id, get_transition_today
+from verify import get_token
+
+
+
+def check_in(username: str, password: str, timeout: int = 10) ->int:
     def vacation_enable(token, timeout):
         headers = {
             "fighter-auth-token": token
         }
-        url = 'https://of.swu.edu.cn/gateway/fighter-baida/api/flow-ext/start-process-instance-by-key'
-        params = {'processDefinitionKey': 'XSQJXJ'}
-        response = requests.post(headers=headers, params=params, json={}, url=url, timeout=timeout)
-        if response.json()["code"] == 200 or response.json()["code"] == 1100:
-            return 0
-        else:
-            return 1
+        url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
+        response = requests.get(url=url, headers=headers, timeout=timeout)
+        #print(response.json())
+        if not response.json()["data"]["records"]:
+            return False
+        is_agree = response.json()["data"]["records"][0]["lcztmc"] == "已同意"
+        if not is_agree:
+            return False
+        now_time = datetime.now()
+        qjxx = response.json()["data"]["records"][0]
+        start_time = datetime.strptime(qjxx["kssj"], "%Y-%m-%d %H:%M")
+        end_time = datetime.strptime(qjxx["jssj"], "%Y-%m-%d %H:%M")
+        if start_time <= now_time <= end_time:
+            return True
+        return False
 
     def checkin_post(token, timeout):
         try:
@@ -60,10 +75,9 @@ def check_in(username: str, password: str, timeout: int = 10):
             return response
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
             return 4
-
-    if not verify(username, password, timeout):
-        return 3
     token = get_token(username, password, timeout)
+    if token == "":
+        return 3
     if vacation_enable(token, timeout):
         return 5
     transition_today =  get_transition_today(token, timeout)
@@ -76,26 +90,7 @@ def check_in(username: str, password: str, timeout: int = 10):
         return 4
     return 1
 
-
 if __name__ == "__main__":
-    print("开始执行签到...")
-    user = os.getenv("SWU_USERNAME", "").strip()
-    pwd = os.getenv("SWU_PASSWORD", "").strip()
-
-    if not user or not pwd:
-        print("缺少账号密码，请设置 SWU_USERNAME/SWU_PASSWORD。")
-        raise SystemExit(1)
-
-    print("已从环境变量读取账号信息。")
-
-    result = check_in(user, pwd)
-    message_map = {
-        0: "今日暂无签到任务。",
-        1: "签到成功。",
-        2: "今日已签到，无需重复操作。",
-        3: "账号或密码验证失败，请检查后重试。",
-        4: "连接错误或请求超时，请稍后重试。",
-        5: "请假中，请检查是否有打卡任务。"
-    }
-    print(message_map.get(result))
-
+    username = os.getenv("SWUDK_USERNAME") or input("校园网账号：").strip()
+    password = os.getenv("SWUDK_PASSWORD") or getpass("校园网密码：")
+    print(check_in(username, password, 10))
