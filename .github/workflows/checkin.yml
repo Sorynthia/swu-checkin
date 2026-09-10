@@ -17,6 +17,23 @@ on:
 jobs:
   checkin:
     runs-on: ubuntu-latest
+    strategy:
+      # 多账号并行执行，失败不影响其他账号
+      fail-fast: false
+      matrix:
+        account:
+          - name: "账号1"
+            username_secret: SWU_USERNAME
+            password_secret: SWU_PASSWORD
+          # 如需添加更多账号，取消下面的注释并配置对应的 Secrets
+          # - name: "账号2"
+          #   username_secret: SWU_USERNAME_2
+          #   password_secret: SWU_PASSWORD_2
+          # - name: "账号3"
+          #   username_secret: SWU_USERNAME_3
+          #   password_secret: SWU_PASSWORD_3
+    
+    name: 签到 - ${{ matrix.account.name }}
     
     steps:
       - name: 检查是否启用
@@ -69,15 +86,28 @@ jobs:
         if: env.ENABLED == 'true'
         id: checkin
         env:
-          SWUDK_USERNAME: ${{ secrets.SWU_USERNAME }}
-          SWUDK_PASSWORD: ${{ secrets.SWU_PASSWORD }}
+          SWUDK_USERNAME: ${{ secrets[matrix.account.username_secret] }}
+          SWUDK_PASSWORD: ${{ secrets[matrix.account.password_secret] }}
         run: |
           echo "========================================="
           echo "开始执行签到任务"
+          echo "账号名称: ${{ matrix.account.name }}"
           echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
-          echo "账号: ${SWUDK_USERNAME:0:4}****${SWUDK_USERNAME: -2}"
+          if [ -n "$SWUDK_USERNAME" ]; then
+            echo "账号: ${SWUDK_USERNAME:0:4}****${SWUDK_USERNAME: -2}"
+          else
+            echo "⚠️  账号未配置（Secret: ${{ matrix.account.username_secret }}）"
+          fi
           echo "========================================="
           echo ""
+          
+          if [ -z "$SWUDK_USERNAME" ] || [ -z "$SWUDK_PASSWORD" ]; then
+            echo "❌ 账号或密码未配置，跳过签到"
+            echo "请在 GitHub Secrets 中配置："
+            echo "  - ${{ matrix.account.username_secret }}"
+            echo "  - ${{ matrix.account.password_secret }}"
+            exit 1
+          fi
           
           python -m swu_checkin.check_in > checkin_result.txt 2>&1
           exit_code=$?
@@ -124,12 +154,13 @@ jobs:
           server_port: ${{ secrets.MAIL_PORT }}
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: '⚠️ SWU 签到异常 - ${{ steps.checkin.outputs.status_msg }}'
+          subject: '⚠️ SWU 签到异常 - ${{ matrix.account.name }} - ${{ steps.checkin.outputs.status_msg }}'
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: ${{ secrets.MAIL_USERNAME }}
           body: |
             ## 签到任务执行异常
             
+            **账号名称**: ${{ matrix.account.name }}
             **执行时间**: ${{ github.event.repository.updated_at }}
             **仓库**: ${{ github.repository }}
             **运行ID**: ${{ github.run_id }}
@@ -176,7 +207,7 @@ jobs:
         run: |
           echo ""
           echo "========================================="
-          echo "任务执行完成"
+          echo "任务执行完成 - ${{ matrix.account.name }}"
           echo "========================================="
           echo "状态码: ${{ steps.checkin.outputs.status_code }}"
           echo "状态信息: ${{ steps.checkin.outputs.status_msg }}"
