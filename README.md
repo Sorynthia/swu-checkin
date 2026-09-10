@@ -11,6 +11,8 @@
 - ✅ 支持请假状态检测
 - ✅ 防重复打卡
 - ✅ 详细状态码返回
+- ✅ GitHub Actions 定时任务
+- ✅ 失败邮件通知
 
 ## 环境要求
 
@@ -19,7 +21,19 @@
 
 ## 快速开始
 
-### 1. 安装依赖
+### 方式一：GitHub Actions 自动签到（推荐）
+
+无需本地环境，全自动云端执行：
+
+1. Fork 本仓库到你的账号
+2. 在仓库 **Settings** → **Secrets** 中配置账号密码
+3. 每天 21:30 自动签到
+
+**详细配置教程**: [GITHUB_ACTIONS.md](GITHUB_ACTIONS.md)
+
+### 方式二：本地运行
+
+#### 1. 安装依赖
 
 ```bash
 # 使用 pip
@@ -29,7 +43,7 @@ pip install -e .
 uv sync
 ```
 
-### 2. 本地运行
+#### 2. 运行脚本
 
 安装后可直接使用命令行工具：
 
@@ -49,7 +63,7 @@ from swu_checkin import check_in
 check_in()
 ```
 
-#### Windows PowerShell
+##### Windows PowerShell
 
 ```powershell
 $env:SWUDK_USERNAME="你的学号"
@@ -57,7 +71,7 @@ $env:SWUDK_PASSWORD="你的密码"
 swu-checkin
 ```
 
-#### Linux / macOS
+##### Linux / macOS
 
 ```bash
 export SWUDK_USERNAME="你的学号"
@@ -80,16 +94,20 @@ swu-checkin
 
 ```
 .
+├── .github/
+│   └── workflows/
+│       └── checkin.yml       # GitHub Actions 工作流
 ├── src/
 │   └── swu_checkin/
 │       ├── __init__.py
-│       ├── check_in.py    # 主打卡脚本
-│       ├── get_info.py    # 信息获取模块
-│       ├── verify.py      # 登录验证模块
-│       ├── identity.py    # 身份选择处理
-│       └── des.py         # DES 加密工具
-├── pyproject.toml         # 项目配置和依赖
-└── README.md
+│       ├── check_in.py       # 主打卡脚本
+│       ├── get_info.py       # 信息获取模块
+│       ├── verify.py         # 登录验证模块
+│       ├── identity.py       # 身份选择处理
+│       └── des.py            # DES 加密工具
+├── pyproject.toml            # 项目配置和依赖
+├── README.md
+└── GITHUB_ACTIONS.md         # Actions 配置指南
 ```
 
 ## 工作流程
@@ -106,6 +124,7 @@ swu-checkin
 - ⚠️ 切勿将账号密码写入代码或提交到仓库
 - ⚠️ 建议在正式使用前先手动测试一次
 - ⚠️ 网络异常时可重试或稍后执行
+- ⚠️ GitHub Actions 使用 Secrets 存储敏感信息，安全可靠
 
 ## 相关项目
 

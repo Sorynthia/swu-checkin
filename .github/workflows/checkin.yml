@@ -1,0 +1,61 @@
+name: 自动签到
+
+on:
+  schedule:
+    # 每天北京时间 21:30 (UTC 13:30)
+    - cron: '30 13 * * *'
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+      
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: 安装依赖
+        run: |
+          pip install --upgrade pip
+          pip install -e .
+      
+      - name: 执行签到
+        id: checkin
+        env:
+          SWUDK_USERNAME: ${{ secrets.SWU_USERNAME }}
+          SWUDK_PASSWORD: ${{ secrets.SWU_PASSWORD }}
+        run: |
+          python -m swu_checkin.check_in > checkin_result.txt 2>&1
+          cat checkin_result.txt
+          echo "result=$(cat checkin_result.txt)" >> $GITHUB_OUTPUT
+        continue-on-error: true
+      
+      - name: 发送失败通知邮件
+        if: failure() || (steps.checkin.outcome == 'failure')
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.MAIL_SERVER }}
+          server_port: ${{ secrets.MAIL_PORT }}
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: '⚠️ SWU 签到失败'
+          to: ${{ secrets.NOTIFY_EMAIL }}
+          from: ${{ secrets.MAIL_USERNAME }}
+          body: |
+            签到任务执行失败
+            
+            时间: ${{ github.event.repository.updated_at }}
+            仓库: ${{ github.repository }}
+            运行ID: ${{ github.run_id }}
+            
+            执行结果:
+            ${{ steps.checkin.outputs.result }}
+            
+            请检查 GitHub Actions 日志获取详细信息:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
