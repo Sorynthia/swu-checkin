@@ -6,91 +6,177 @@ import time
 
 import requests
 
-from get_info import get_dormitory, get_student_id, get_transition_today
-from verify import get_token
+from .get_info import get_dormitory, get_student_id, get_transition_today, get_token
 
 
-
-def check_in(username: str, password: str, timeout: int = 10) ->int:
-    def vacation_enable(token, timeout):
-        headers = {
-            "fighter-auth-token": token
-        }
-        url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
+def _check_vacation_enabled(token: str, timeout: int) -> bool:
+    """检查是否在请假期间"""
+    headers = {"fighter-auth-token": token}
+    url = "https://of.swu.edu.cn/gateway/fighter-baida/api/xsqjxj/listSelfLeaveData?pageNum=1&pageSize=10"
+    
+    try:
         response = requests.get(url=url, headers=headers, timeout=timeout)
-        #print(response.json())
-        if not response.json()["data"]["records"]:
+        data = response.json().get("data", {})
+        records = data.get("records", [])
+        
+        if not records:
             return False
-        is_agree = response.json()["data"]["records"][0]["lcztmc"] == "已同意"
-        if not is_agree:
+        
+        latest = records[0]
+        if latest.get("lcztmc") != "已同意":
             return False
-        now_time = datetime.now()
-        qjxx = response.json()["data"]["records"][0]
-        start_time = datetime.strptime(qjxx["kssj"], "%Y-%m-%d %H:%M")
-        end_time = datetime.strptime(qjxx["jssj"], "%Y-%m-%d %H:%M")
-        if start_time <= now_time <= end_time:
-            return True
+        
+        now = datetime.now()
+        start = datetime.strptime(latest["kssj"], "%Y-%m-%d %H:%M")
+        end = datetime.strptime(latest["jssj"], "%Y-%m-%d %H:%M")
+        
+        return start <= now <= end
+    except (requests.exceptions.RequestException, KeyError, ValueError):
         return False
 
-    def checkin_post(token, timeout):
-        try:
-            transition_today = get_transition_today(token)
-            if transition_today is None:
-                return None
-            formid = transition_today["formId"]
-            id = transition_today["id"]
-            headers = {"fighter-auth-token": token, "Content-Type": "application/json;charset=UTF-8"}
-            url = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
-            params = {"formId": formid, "isSubmitProcess": False}
-            dormitory = get_dormitory(token, timeout)["data"]["columnList"]
-            payload = {
-                "id": id,
-                "formId": formid,
-                "tsrq": time.strftime("%Y-%m-%d"),
-                "xh": get_student_id(token),
-                "qdsj": ["21:00", "23:30"],
-                "qsqddd": dormitory[1]["value"],
-                "qdbj": dormitory[2]["value"],
-                "qddz": {
-                    "latitude": dormitory[0]["latitude"],
-                    "longitude": dormitory[0]["longitude"],
-                    "address": dormitory[1]["value"],
-                    "netType": "wifi",
-                    "operatorType": "unknown",
-                    "imei": "imei",
-                    "time": int(time.time() * 1000),
-                    "provider": "lbs",
-                    "isFromMock": False,
-                    "isGpsEnabled": True,
-                    "isWifiEnabled": True,
-                    "isMobileEnabled": False,
-                    "isOffset": True,
-                    "cityAdCode": "023",
-                    "districtAdCode": "500109",
-                    "isArea": True,
-                    "tip": "当前在签到范围内"
-                }
+
+def _parse_dormitory_data(dormitory_list: list) -> tuple[dict, str, str]:
+    """
+    从 getDormitory 返回的 columnList 解析签到数据
+    返回: (位置信息, 宿舍楼名, 房间号)
+    """
+    location = None
+    building = None
+    room = None
+    
+    for item in dormitory_list:
+        prop = item.get("prop", "")
+        if prop == "qddz":
+            location = {
+                "latitude": item.get("latitude"),
+                "longitude": item.get("longitude")
             }
-            response = requests.post(url, headers=headers, params=params, data=json.dumps(payload), timeout=timeout).json()["data"]
-            return response
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
-            return 4
-    token = get_token(username, password, timeout)
-    if token == "":
-        return 3
-    if vacation_enable(token, timeout):
-        return 5
-    transition_today =  get_transition_today(token, timeout)
-    if not transition_today:
-        return 0
-    if transition_today["qdzt"] == "已签到":
-        return 2
-    post_result = checkin_post(token, timeout)
-    if post_result == 4:
+        elif prop == "qsqddd":
+            building = item.get("value")
+        elif prop == "qdbj":
+            room = item.get("value")
+    
+    if not all([location, building, room]):
+        raise ValueError("宿舍信息不完整")
+    
+    return location, building, room
+
+
+def _submit_checkin(token: str, timeout: int) -> int:
+    """
+    执行签到请求
+    返回: 1=成功, 4=网络错误, None=无今日记录
+    """
+    try:
+        transition = get_transition_today(token, timeout)
+        if transition is None:
+            return None
+        
+        form_id = transition["formId"]
+        record_id = transition["id"]
+        
+        # 获取宿舍信息
+        dorm_response = get_dormitory(token, timeout)
+        column_list = dorm_response.get("data", {}).get("columnList", [])
+        location, building, room = _parse_dormitory_data(column_list)
+        
+        headers = {
+            "fighter-auth-token": token,
+            "Content-Type": "application/json;charset=UTF-8"
+        }
+        url = "https://of.swu.edu.cn/gateway/fighter-baida/api/form-instance/save"
+        params = {"formId": form_id, "isSubmitProcess": False}
+        
+        payload = {
+            "id": record_id,
+            "formId": form_id,
+            "tsrq": time.strftime("%Y-%m-%d"),
+            "xh": get_student_id(token, timeout),
+            "qdsj": ["21:00", "23:30"],
+            "qsqddd": building,
+            "qdbj": room,
+            "qddz": {
+                "latitude": location["latitude"],
+                "longitude": location["longitude"],
+                "address": building,
+                "netType": "wifi",
+                "operatorType": "unknown",
+                "imei": "imei",
+                "time": int(time.time() * 1000),
+                "provider": "lbs",
+                "isFromMock": False,
+                "isGpsEnabled": True,
+                "isWifiEnabled": True,
+                "isMobileEnabled": False,
+                "isOffset": True,
+                "cityAdCode": "023",
+                "districtAdCode": "500109",
+                "isArea": True,
+                "tip": "当前在签到范围内"
+            }
+        }
+        
+        response = requests.post(
+            url,
+            headers=headers,
+            params=params,
+            data=json.dumps(payload),
+            timeout=timeout
+        )
+        response.raise_for_status()
+        return 1
+        
+    except requests.exceptions.RequestException:
         return 4
-    return 1
+    except (KeyError, ValueError, TypeError):
+        return 4
+
+
+def check_in(username: str, password: str, timeout: int = 10) -> int:
+    """
+    执行宿舍签到
+    
+    返回值:
+        0: 今日无签到记录
+        1: 签到成功
+        2: 已签到
+        3: 登录失败
+        4: 网络错误或数据异常
+        5: 请假期间无需签到
+    """
+    token = get_token(username, password, timeout)
+    if not token:
+        return 3
+    
+    if _check_vacation_enabled(token, timeout):
+        return 5
+    
+    transition = get_transition_today(token, timeout)
+    if not transition:
+        return 0
+    
+    if transition.get("qdzt") == "已签到":
+        return 2
+    
+    result = _submit_checkin(token, timeout)
+    if result is None:
+        return 0
+    
+    return result
+
 
 if __name__ == "__main__":
     username = os.getenv("SWUDK_USERNAME") or input("校园网账号：").strip()
     password = os.getenv("SWUDK_PASSWORD") or getpass("校园网密码：")
-    print(check_in(username, password, 10))
+    
+    status_messages = {
+        0: "今日无签到记录",
+        1: "签到成功",
+        2: "已签到",
+        3: "登录失败",
+        4: "网络错误或数据异常",
+        5: "请假期间无需签到"
+    }
+    
+    result = check_in(username, password, 10)
+    print(f"[{result}] {status_messages.get(result, '未知状态')}")
