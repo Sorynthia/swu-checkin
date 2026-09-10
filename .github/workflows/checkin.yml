@@ -1,5 +1,13 @@
 name: 自动签到
 
+# ========================================
+# 开关配置
+# ========================================
+# 如需启用自动签到，将 ENABLED 改为 true
+# 如需禁用自动签到，将 ENABLED 改为 false
+env:
+  ENABLED: false  # 默认关闭，需要手动改为 true
+
 on:
   schedule:
     # 每天北京时间 21:30 (UTC 13:30)
@@ -11,16 +19,42 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
+      - name: 检查是否启用
+        id: check_enabled
+        run: |
+          if [ "${{ env.ENABLED }}" != "true" ]; then
+            echo "========================================="
+            echo "⚠️  自动签到未启用"
+            echo "========================================="
+            echo ""
+            echo "如需启用自动签到，请编辑 .github/workflows/checkin.yml"
+            echo "将 ENABLED 改为 true"
+            echo ""
+            echo "步骤："
+            echo "1. 进入仓库主页"
+            echo "2. 打开 .github/workflows/checkin.yml"
+            echo "3. 点击编辑按钮"
+            echo "4. 将 'ENABLED: false' 改为 'ENABLED: true'"
+            echo "5. 提交更改"
+            echo ""
+            echo "========================================="
+            exit 1
+          fi
+          echo "✅ 自动签到已启用"
+      
       - name: 检出代码
+        if: env.ENABLED == 'true'
         uses: actions/checkout@v4
       
       - name: 设置 Python
+        if: env.ENABLED == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
       
       - name: 安装依赖
+        if: env.ENABLED == 'true'
         run: |
           echo "========================================="
           echo "开始安装依赖..."
@@ -32,6 +66,7 @@ jobs:
           echo ""
       
       - name: 执行签到
+        if: env.ENABLED == 'true'
         id: checkin
         env:
           SWUDK_USERNAME: ${{ secrets.SWU_USERNAME }}
@@ -82,7 +117,7 @@ jobs:
         continue-on-error: true
       
       - name: 发送通知邮件
-        if: steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
+        if: env.ENABLED == 'true' && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
@@ -137,7 +172,7 @@ jobs:
             查看详细日志: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       
       - name: 最终状态检查
-        if: always()
+        if: always() && env.ENABLED == 'true'
         run: |
           echo ""
           echo "========================================="

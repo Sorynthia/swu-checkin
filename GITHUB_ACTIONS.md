@@ -6,6 +6,52 @@
 - **手动触发**: 支持在 GitHub Actions 页面手动运行
 - **智能通知**: 签到异常时自动发送详细邮件通知
 - **详细日志**: 完整记录每步执行情况，便于排查问题
+- **开关控制**: 默认关闭，需要手动启用
+
+---
+
+## 快速开始
+
+### 第一步：启用自动签到
+
+1. 进入仓库主页
+2. 打开文件：`.github/workflows/checkin.yml`
+3. 点击右上角 **编辑按钮**（铅笔图标）
+4. 找到第 7 行，将 `ENABLED: false` 改为 `ENABLED: true`
+5. 点击 **Commit changes** 提交
+
+```yaml
+# 修改前
+env:
+  ENABLED: false  # 默认关闭
+
+# 修改后
+env:
+  ENABLED: true   # 启用自动签到
+```
+
+### 第二步：配置账号密码
+
+进入仓库页面: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
+
+添加以下 secrets（⚠️ 不要提交到代码里）:
+
+| Secret 名称 | 说明 | 示例 |
+|------------|------|------|
+| SWU_USERNAME | 校园网账号 | 2021xxxxxx |
+| SWU_PASSWORD | 校园网密码 | your_password |
+
+### 第三步：配置邮件通知（可选）
+
+如果需要签到异常时收到邮件通知，继续添加以下配置：
+
+| Secret 名称 | 说明 | 示例 |
+|------------|------|------|
+| MAIL_SERVER | SMTP 服务器地址 | smtp.gmail.com / smtp.qq.com |
+| MAIL_PORT | SMTP 端口 | 587 (TLS) 或 465 (SSL) |
+| MAIL_USERNAME | 发件邮箱账号 | your_email@gmail.com |
+| MAIL_PASSWORD | 邮箱授权码（不是登录密码） | xxxx xxxx xxxx xxxx |
+| NOTIFY_EMAIL | 接收通知的邮箱 | your_email@qq.com |
 
 ---
 
@@ -22,35 +68,6 @@
 - ℹ️ `[5]` 请假期间无需签到
 
 邮件包含状态码、详细原因和处理建议。
-
----
-
-## 配置步骤
-
-### 1. 配置 GitHub Secrets
-
-进入仓库页面: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**
-
-添加以下 secrets（⚠️ 不要提交到代码里）:
-
-#### 必需配置
-
-| Secret 名称 | 说明 | 示例 |
-|------------|------|------|
-| SWU_USERNAME | 校园网账号 | 2021xxxxxx |
-| SWU_PASSWORD | 校园网密码 | your_password |
-
-#### 邮件通知配置（可选）
-
-如果需要签到异常时收到邮件通知，添加以下配置：
-
-| Secret 名称 | 说明 | 示例 |
-|------------|------|------|
-| MAIL_SERVER | SMTP 服务器地址 | smtp.gmail.com / smtp.qq.com |
-| MAIL_PORT | SMTP 端口 | 587 (TLS) 或 465 (SSL) |
-| MAIL_USERNAME | 发件邮箱账号 | your_email@gmail.com |
-| MAIL_PASSWORD | 邮箱授权码（不是登录密码） | xxxx xxxx xxxx xxxx |
-| NOTIFY_EMAIL | 接收通知的邮箱 | your_email@qq.com |
 
 ---
 
@@ -93,7 +110,7 @@ MAIL_PASSWORD: 邮箱密码或应用密码
 ## 使用说明
 
 ### 自动运行
-配置完成后，Actions 会在每天 21:30 自动执行。
+启用后，Actions 会在每天 21:30 自动执行。
 
 ### 手动触发
 1. 进入仓库 **Actions** 页面
@@ -114,6 +131,25 @@ MAIL_PASSWORD: 邮箱密码或应用密码
 ---
 
 ## 日志示例
+
+### 未启用时
+```
+=========================================
+⚠️  自动签到未启用
+=========================================
+
+如需启用自动签到，请编辑 .github/workflows/checkin.yml
+将 ENABLED 改为 true
+
+步骤：
+1. 进入仓库主页
+2. 打开 .github/workflows/checkin.yml
+3. 点击编辑按钮
+4. 将 'ENABLED: false' 改为 'ENABLED: true'
+5. 提交更改
+
+=========================================
+```
 
 ### 成功签到
 ```
@@ -219,19 +255,23 @@ schedule:
 4. 查看 Actions 日志中的邮件发送错误
 
 ### Actions 未执行
-1. 检查仓库是否启用了 Actions
-2. 确认工作流文件路径: `.github/workflows/checkin.yml`
-3. 验证 cron 表达式格式
-4. 检查 Secrets 是否正确配置
+1. 检查是否已启用自动签到（`ENABLED: true`）
+2. 检查仓库是否启用了 Actions
+3. 确认工作流文件路径: `.github/workflows/checkin.yml`
+4. 验证 cron 表达式格式
+5. 检查 Secrets 是否正确配置
 
 ---
 
 ## 禁用自动签到
 
-### 临时禁用
+### 方法一：关闭开关（推荐）
+编辑 `.github/workflows/checkin.yml`，将 `ENABLED: true` 改为 `ENABLED: false`
+
+### 方法二：临时禁用
 **Actions** → **自动签到** → **Disable workflow**
 
-### 永久删除
+### 方法三：永久删除
 删除文件: `.github/workflows/checkin.yml`
 
 ---
@@ -243,6 +283,7 @@ schedule:
 1. 复制 `checkin.yml` 为 `checkin2.yml`
 2. 修改 workflow 名称
 3. 使用不同的 Secrets（如 `SWU_USERNAME_2`）
+4. 将开关改为 `ENABLED: true`
 
 ### 自定义通知内容
 编辑 `.github/workflows/checkin.yml` 中的 `body` 部分，自定义邮件模板。
