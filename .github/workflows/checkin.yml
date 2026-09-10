@@ -22,8 +22,14 @@ jobs:
       
       - name: 安装依赖
         run: |
+          echo "========================================="
+          echo "开始安装依赖..."
+          echo "========================================="
           pip install --upgrade pip
           pip install -e .
+          echo ""
+          echo "✅ 依赖安装完成"
+          echo ""
       
       - name: 执行签到
         id: checkin
@@ -31,31 +37,120 @@ jobs:
           SWUDK_USERNAME: ${{ secrets.SWU_USERNAME }}
           SWUDK_PASSWORD: ${{ secrets.SWU_PASSWORD }}
         run: |
+          echo "========================================="
+          echo "开始执行签到任务"
+          echo "时间: $(TZ='Asia/Shanghai' date '+%Y-%m-%d %H:%M:%S')"
+          echo "账号: ${SWUDK_USERNAME:0:4}****${SWUDK_USERNAME: -2}"
+          echo "========================================="
+          echo ""
+          
           python -m swu_checkin.check_in > checkin_result.txt 2>&1
+          exit_code=$?
+          
+          echo ""
+          echo "========================================="
+          echo "签到结果"
+          echo "========================================="
           cat checkin_result.txt
-          echo "result=$(cat checkin_result.txt)" >> $GITHUB_OUTPUT
+          echo ""
+          
+          # 提取返回码和消息
+          result_line=$(cat checkin_result.txt | tail -1)
+          status_code=$(echo "$result_line" | grep -oP '\[\K[0-9]+(?=\])')
+          status_msg=$(echo "$result_line" | grep -oP '\] \K.*')
+          
+          echo "status_code=$status_code" >> $GITHUB_OUTPUT
+          echo "status_msg=$status_msg" >> $GITHUB_OUTPUT
+          echo "full_result=$result_line" >> $GITHUB_OUTPUT
+          echo "exit_code=$exit_code" >> $GITHUB_OUTPUT
+          
+          echo "========================================="
+          echo "状态码: $status_code"
+          echo "状态信息: $status_msg"
+          echo "退出码: $exit_code"
+          echo "========================================="
+          
+          # 1=成功, 2=已签到，其他都算失败
+          if [ "$status_code" != "1" ] && [ "$status_code" != "2" ]; then
+            echo ""
+            echo "⚠️  签到异常，准备发送通知邮件"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ 签到正常完成"
         continue-on-error: true
       
-      - name: 发送失败通知邮件
-        if: failure() || (steps.checkin.outcome == 'failure')
+      - name: 发送通知邮件
+        if: steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
           server_port: ${{ secrets.MAIL_PORT }}
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_PASSWORD }}
-          subject: '⚠️ SWU 签到失败'
+          subject: '⚠️ SWU 签到异常 - ${{ steps.checkin.outputs.status_msg }}'
           to: ${{ secrets.NOTIFY_EMAIL }}
           from: ${{ secrets.MAIL_USERNAME }}
           body: |
-            签到任务执行失败
+            ## 签到任务执行异常
             
-            时间: ${{ github.event.repository.updated_at }}
-            仓库: ${{ github.repository }}
-            运行ID: ${{ github.run_id }}
+            **执行时间**: ${{ github.event.repository.updated_at }}
+            **仓库**: ${{ github.repository }}
+            **运行ID**: ${{ github.run_id }}
             
-            执行结果:
-            ${{ steps.checkin.outputs.result }}
+            ---
             
-            请检查 GitHub Actions 日志获取详细信息:
-            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ### 签到结果
+            
+            **状态码**: ${{ steps.checkin.outputs.status_code }}
+            **状态信息**: ${{ steps.checkin.outputs.status_msg }}
+            
+            ### 状态码说明
+            
+            - [0] 今日无签到记录
+            - [1] ✅ 签到成功
+            - [2] ✅ 已签到
+            - [3] ❌ 登录失败
+            - [4] ❌ 网络错误或数据异常
+            - [5] ℹ️ 请假期间无需签到
+            
+            ---
+            
+            ### 完整输出
+            
+            `
+            ${{ steps.checkin.outputs.full_result }}
+            `
+            
+            ---
+            
+            ### 操作建议
+            
+            **状态码 0**: 今日暂无签到任务，无需处理
+            **状态码 3**: 请检查 GitHub Secrets 中的账号密码是否正确
+            **状态码 4**: 网络异常或学校系统维护，稍后会自动重试
+            **状态码 5**: 请假期间自动跳过，无需处理
+            
+            ---
+            
+            查看详细日志: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      
+      - name: 最终状态检查
+        if: always()
+        run: |
+          echo ""
+          echo "========================================="
+          echo "任务执行完成"
+          echo "========================================="
+          echo "状态码: ${{ steps.checkin.outputs.status_code }}"
+          echo "状态信息: ${{ steps.checkin.outputs.status_msg }}"
+          
+          if [ "${{ steps.checkin.outputs.status_code }}" = "1" ]; then
+            echo "✅ 签到成功"
+          elif [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
+            echo "✅ 已签到，无需重复"
+          else
+            echo "⚠️  签到异常，已发送通知邮件"
+          fi
+          echo "========================================="
