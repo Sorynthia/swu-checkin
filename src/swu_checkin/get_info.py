@@ -93,9 +93,9 @@ def parse_code_random(html: str) -> str:
     return code_random.get('value') if code_random else None
 
 
-def recognize_captcha(session: requests.Session) -> str:
+def recognize_captcha(session: requests.Session, timeout: int = 10) -> str:
     """OCR 识别验证码"""
-    response = session.get(IDM_VALIDATE_CODE_URL)
+    response = session.get(IDM_VALIDATE_CODE_URL, timeout=timeout)
     img = Image.open(BytesIO(response.content))
     ocr = ddddocr.DdddOcr(show_ad=False, use_gpu=False)
     return ocr.classification(img)
@@ -141,6 +141,13 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
     返回:
         成功返回 token，失败返回空字符串
     """
+    try:
+        return _get_token(username, password, timeout)
+    except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return ""
+
+
+def _get_token(username: str, password: str, timeout: int) -> str:
     session = requests.Session()
     
     # 步骤 1: 获取 OAuth state
@@ -168,7 +175,7 @@ def get_token(username: str, password: str, timeout: int = 10) -> str:
     encrypted_username, encrypted_password = des(username, password, code_random)
     
     # 步骤 4: OCR 识别验证码
-    captcha = recognize_captcha(session)
+    captcha = recognize_captcha(session, timeout)
     debug_print(f"code: {captcha}")
     
     # 步骤 5: 提交登录表单

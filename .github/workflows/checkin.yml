@@ -1,17 +1,13 @@
 name: 自动签到
 
-# ========================================
-# 开关配置
-# ========================================
-# 如需启用自动签到，将 ENABLED 改为 true
-# 如需禁用自动签到，将 ENABLED 改为 false
-env:
-  ENABLED: false  # 默认关闭，需要手动改为 true
+# 停用方式：仓库 Actions → 自动签到 → Disable workflow
+# GitHub 官方禁用 workflow 后，定时任务和手动触发都会停止
 
 on:
   schedule:
-    # 每天北京时间 21:30 (UTC 13:30)
-    - cron: '30 13 * * *'
+    # 每天北京时间 21:00（UTC 13:00）
+    # GitHub Actions 定时任务可能有几分钟到十几分钟延迟，实际执行时间通常晚于 21:00
+    - cron: '0 13 * * *'
   workflow_dispatch:  # 允许手动触发
 
 jobs:
@@ -36,42 +32,16 @@ jobs:
     name: 签到 - ${{ matrix.account.name }}
     
     steps:
-      - name: 检查是否启用
-        id: check_enabled
-        run: |
-          if [ "${{ env.ENABLED }}" != "true" ]; then
-            echo "========================================="
-            echo "⚠️  自动签到未启用"
-            echo "========================================="
-            echo ""
-            echo "如需启用自动签到，请编辑 .github/workflows/checkin.yml"
-            echo "将 ENABLED 改为 true"
-            echo ""
-            echo "步骤："
-            echo "1. 进入仓库主页"
-            echo "2. 打开 .github/workflows/checkin.yml"
-            echo "3. 点击编辑按钮"
-            echo "4. 将 'ENABLED: false' 改为 'ENABLED: true'"
-            echo "5. 提交更改"
-            echo ""
-            echo "========================================="
-            exit 1
-          fi
-          echo "✅ 自动签到已启用"
-      
       - name: 检出代码
-        if: env.ENABLED == 'true'
         uses: actions/checkout@v4
       
       - name: 设置 Python
-        if: env.ENABLED == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
       
       - name: 安装依赖
-        if: env.ENABLED == 'true'
         run: |
           echo "========================================="
           echo "开始安装依赖..."
@@ -83,11 +53,13 @@ jobs:
           echo ""
       
       - name: 执行签到
-        if: env.ENABLED == 'true'
         id: checkin
         env:
           SWUDK_USERNAME: ${{ secrets[matrix.account.username_secret] }}
           SWUDK_PASSWORD: ${{ secrets[matrix.account.password_secret] }}
+          # 瞬时失败自动重试：总尝试 3 次，首次等待 8 秒后指数退避
+          SWUDK_MAX_ATTEMPTS: "3"
+          SWUDK_RETRY_DELAY: "8"
         run: |
           echo "========================================="
           echo "开始执行签到任务"
@@ -135,10 +107,10 @@ jobs:
           echo "退出码: $exit_code"
           echo "========================================="
           
-          # 1=成功, 2=已签到，其他都算失败
+          # 1=成功, 2=已签到；其余状态已在脚本内重试，仍失败才告警
           if [ "$status_code" != "1" ] && [ "$status_code" != "2" ]; then
             echo ""
-            echo "⚠️  签到异常，准备发送通知邮件"
+            echo "⚠️  多次重试后仍异常，准备发送通知邮件"
             exit 1
           fi
           
@@ -147,7 +119,7 @@ jobs:
         continue-on-error: true
       
       - name: 发送通知邮件
-        if: env.ENABLED == 'true' && steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
+        if: steps.checkin.outputs.status_code != '1' && steps.checkin.outputs.status_code != '2'
         uses: dawidd6/action-send-mail@v3
         with:
           server_address: ${{ secrets.MAIL_SERVER }}
@@ -159,6 +131,8 @@ jobs:
           from: ${{ secrets.MAIL_USERNAME }}
           body: |
             ## 签到任务执行异常
+            
+            脚本已自动重试多次，以下为最终结果。
             
             **账号名称**: ${{ matrix.account.name }}
             **执行时间**: ${{ github.event.repository.updated_at }}
@@ -195,7 +169,7 @@ jobs:
             
             **状态码 0**: 今日暂无签到任务，无需处理
             **状态码 3**: 请检查 GitHub Secrets 中的账号密码是否正确
-            **状态码 4**: 网络异常或学校系统维护，稍后会自动重试
+            **状态码 4**: 网络异常或学校系统维护，本次已自动重试仍失败
             **状态码 5**: 请假期间自动跳过，无需处理
             
             ---
@@ -203,7 +177,7 @@ jobs:
             查看详细日志: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
       
       - name: 最终状态检查
-        if: always() && env.ENABLED == 'true'
+        if: always()
         run: |
           echo ""
           echo "========================================="
@@ -217,6 +191,6 @@ jobs:
           elif [ "${{ steps.checkin.outputs.status_code }}" = "2" ]; then
             echo "✅ 已签到，无需重复"
           else
-            echo "⚠️  签到异常，已发送通知邮件"
+            echo "⚠️  多次重试后仍异常，已发送通知邮件"
           fi
           echo "========================================="
